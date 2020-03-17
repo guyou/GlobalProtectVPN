@@ -9,9 +9,9 @@ const Mainloop  = imports.mainloop;
 const ByteArray = imports.byteArray;    
 
 // Commands to run
-const CMD_VPNSTATUS  = "nordvpn status";
-const CMD_CONNECT    = "nordvpn c";
-const CMD_DISCONNECT = "nordvpn d";
+const CMD_VPNSTATUS  = "globalprotect show --status";
+const CMD_CONNECT    = "globalprotect connect";
+const CMD_DISCONNECT = "globalprotect disconnect";
 // Menu display text
 const MENU_CONNECT       = "Connect";
 const MENU_DISCONNECT    = "Disconnect";
@@ -19,7 +19,7 @@ const MENU_DISCONNECT    = "Disconnect";
 const STATE_OVERRIDE_DURATION=10
 // VPN states and associated config
 let _states = {
-    "Status: Connected": { 
+    "GlobalProtect status: Connected": { 
         "panelShowServer":true, // Indicates the panel text is built up with the country and ID of the VPN server
         "styleClass":"green",   // CSS class for panel button
         "canConnect":false,     // Connect menu item enabled true/false
@@ -27,7 +27,7 @@ let _states = {
         "refreshTimeout":30,    // Seconds to refresh when this is the status
         "clearsOverrideId":1    // Clears a status override with this ID
     },
-    "Status: Connecting": { 
+    "GlobalProtect status: Connecting": { 
         "panelText":"CONNECTING...", // Static panel button text
         "styleClass":"amber",
         "canConnect":false,
@@ -35,7 +35,7 @@ let _states = {
         "refreshTimeout":1,
         "overrideId":1               // Allows an override of this state to be cleared by a state with clearsOverrideId of the same ID
     },
-    "Status: Disconnected": { 
+    "GlobalProtect status: Disconnected": { 
         "panelText":"UNPROTECTED",
         "styleClass":"red",
         "canConnect":true,
@@ -43,7 +43,7 @@ let _states = {
         "refreshTimeout":10,
         "clearsOverrideId":2
     },
-    "Status: Disconnecting": { 
+    "GlobalProtect status: Disconnecting": { 
         "panelText":"DISCONNECTING...",
         "styleClass":"amber",
         "canConnect":true,
@@ -51,14 +51,14 @@ let _states = {
         "refreshTimeout":1,
         "overrideId":2
     },
-    "Status: Reconnecting": { 
+    "GlobalProtect Status: Reconnecting": { 
         "panelText":"RECONNECTING...",
         "styleClass":"amber",
         "canConnect":false,
         "canDisconnect":true,
         "refreshTimeout":10
     },
-    "Status: Restarting": { 
+    "GlobalProtect Status: Restarting": { 
         "panelText":"RESTARTING...",
         "styleClass":"amber",
         "canConnect":false,
@@ -76,7 +76,7 @@ let _states = {
 
 // Extension, panel button, menu items, timeout
 let _vpnIndicator, _panelLabel, _statusLabel, _connectMenuItem, _disconnectMenuItem, 
-    _connectMenuItemClickId, _updateMenuLabel, _disconnectMenuItemClickId, _timeout, _menuItemClickId;
+    _connectMenuItemClickId, _disconnectMenuItemClickId, _timeout, _menuItemClickId;
 
 // State persistence
 let _stateOverride, _stateOverrideCounter;
@@ -88,27 +88,6 @@ const VpnIndicator = new Lang.Class({
     _init: function () {
         // Init the parent
         this.parent(0.0, "VPN Indicator", false);
-    },
-
-    _buildCountrySelector() {
-        const cPopupMenuExpander = new PopupMenu.PopupSubMenuMenuItem('Countries');
-        const [ok, standardOut, standardError, exitStatus] = GLib.spawn_command_line_sync("nordvpn countries");
-        const countries = ByteArray.toString(standardOut).replace(/\s+/g,' ').split(' ');
-        countries.sort();
-
-        for (var i=3; i<countries.length; i++) {
-            const country = countries[i].replace(",","");
-            const menuitm = new PopupMenu.PopupMenuItem(country);
-            _menuItemClickId = menuitm.connect('activate', Lang.bind(this,function(actor, event) {
-                GLib.spawn_command_line_async(`${CMD_CONNECT} ${actor.label.get_text()}`);
-            }));
-
-            const stringStartsWithCapitalLetter = country => country && country.charCodeAt(0) >= 65 && country.charCodeAt(0) <= 90;
-
-            stringStartsWithCapitalLetter(country) && cPopupMenuExpander.menu.addMenuItem(menuitm);
-        }
-
-        return cPopupMenuExpander;
     },
 
     enable () {
@@ -138,7 +117,6 @@ const VpnIndicator = new Lang.Class({
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
         this.menu.addMenuItem(_connectMenuItem);
         this.menu.addMenuItem(_disconnectMenuItem);
-        this.menu.addMenuItem(this._buildCountrySelector());
 
         // Add the button and a popup menu
         this.actor.add_actor(button);
@@ -155,11 +133,6 @@ const VpnIndicator = new Lang.Class({
 
         // Convert Uint8Array object to string and split up the different messages
         const statusMessages = ByteArray.toString(standardOut).split('\n');
-
-        // Check to see if a new version is available and display message in menu if so
-        const updateAvailableText = statusMessages[0].includes('new version')
-            ? statusMessages.shift(1)
-            : null;
 
         // Determine the correct state from the "Status: xxxx" line
         // TODO: use results from vpn command to give details of error
@@ -180,24 +153,17 @@ const VpnIndicator = new Lang.Class({
         }
 
         // Update the menu and panel based on the current state
-        this._updateMenu(vpnStatus, statusMessages[0], updateAvailableText);
+        this._updateMenu(vpnStatus, statusMessages[0]);
         this._updatePanel(vpnStatus, statusMessages);
 
         // Start the refreshes again
         this._setTimeout(vpnStatus.refreshTimeout);
     },
 
-    _updateMenu (vpnStatus, statusText, updateAvailableText) {
+    _updateMenu (vpnStatus, statusText) {
         // Set the status text on the menu
         _statusLabel.text = statusText;
         
-        if (updateAvailableText) {
-            _updateMenuLabel.text = updateAvailableText;
-            _updateMenuLabel.visible = true;
-        } else {
-            _updateMenuLabel.visible = false;;
-        }
-
         // Activate / deactivate menu items
         _connectMenuItem.actor.reactive = vpnStatus.canConnect;
         _disconnectMenuItem.actor.reactive = vpnStatus.canDisconnect;
@@ -223,7 +189,7 @@ const VpnIndicator = new Lang.Class({
         GLib.spawn_command_line_async(CMD_CONNECT);
 
         // Set an override on the status as the command line status takes a while to catch up
-        _stateOverride = _states["Status: Connecting"];
+        _stateOverride = _states["GlobalProtect status: Connecting"];
         _stateOverrideCounter = 0;
 
         this._refresh();
@@ -234,7 +200,7 @@ const VpnIndicator = new Lang.Class({
         GLib.spawn_command_line_async(CMD_DISCONNECT);
 
         // Set an override on the status as the command line status takes a while to catch up
-        _stateOverride = _states["Status: Disconnecting"];
+        _stateOverride = _states["GlobalProtect status: Disconnecting"];
         _stateOverrideCounter = 0;
 
         this._refresh();
