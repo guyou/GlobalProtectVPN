@@ -183,26 +183,75 @@ const VpnIndicator = new Lang.Class({
         _panelLabel.style_class = vpnStatus.styleClass;
     },
 
+    _parseCmd: function (cmd) {
+        let successP, argv;
+
+        try {
+            [successP, argv] = GLib.shell_parse_argv(cmd);
+        }
+        catch (err) {
+            log('ERROR PARSE');
+            successP = false;
+        }
+        if (successP) {
+            log('DEBUG: parse: ' + successP + ' argv: ' + argv);
+            return [successP, argv];
+        } else {
+            return [successP, null];
+        }
+    },
+
+    _spawn (cmd, state) {
+        let [successP, argv] = this._parseCmd(cmd);
+        if (successP) {
+            let successS, pid;
+            try {
+                // Remove proxy from environment
+                // Globale Protect use an HTTPS link.
+                let envp = GLib.get_environ();
+                envp = GLib.environ_unsetenv(envp, "http_proxy");
+                envp = GLib.environ_unsetenv(envp, "https_proxy");
+                envp = GLib.environ_unsetenv(envp, "all_proxy");
+                envp = GLib.environ_unsetenv(envp, "socks_proxy");
+                envp = GLib.environ_unsetenv(envp, "ftp_proxy");
+                envp = GLib.environ_unsetenv(envp, "HTTP_PROXY");
+                envp = GLib.environ_unsetenv(envp, "HTTPS_PROXY");
+                envp = GLib.environ_unsetenv(envp, "ALL_PROXY");
+                [successS, pid] = GLib.spawn_async(null, argv, envp,
+                    GLib.SpawnFlags.SEARCH_PATH |
+                    GLib.SpawnFlags.DO_NOT_REAP_CHILD, null);
+
+                // Set an override on the status as the command line status takes a while to catch up
+                _stateOverride = state;
+                _stateOverrideCounter = 0;
+
+                GLib.child_watch_add(GLib.PRIORITY_DEFAULT, pid, Lang.bind(this, this._childExited));
+
+                this._refresh();
+            }
+            catch (err) {
+                log('ERROR SPAWN err:' + err.message.toString());
+                successS = false;
+            }
+
+            if (successS) {
+                log('DEBUG: spawn: ' + successS + ' pid: ' + pid);
+                return true;
+            } else {
+                log('spawn ERROR');
+                return null;
+            }
+        }
+    },
+
     _connect () {
         // Run the connect command
-        GLib.spawn_command_line_async(CMD_CONNECT);
-
-        // Set an override on the status as the command line status takes a while to catch up
-        _stateOverride = _states["GlobalProtect status: Connecting"];
-        _stateOverrideCounter = 0;
-
-        this._refresh();
+        this._spawn(CMD_CONNECT, _states["GlobalProtect status: Connecting"]);
     },
 
     _disconnect () {
         // Run the disconnect command
-        GLib.spawn_command_line_async(CMD_DISCONNECT);
-
-        // Set an override on the status as the command line status takes a while to catch up
-        _stateOverride = _states["GlobalProtect status: Disconnecting"];
-        _stateOverrideCounter = 0;
-
-        this._refresh();
+        this._spawn(CMD_DISCONNECT, _states["GlobalProtect status: Disconnecting"]);
     },
 
     _clearTimeout () {
