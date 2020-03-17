@@ -20,7 +20,7 @@ const STATE_OVERRIDE_DURATION=10
 // VPN states and associated config
 let _states = {
     "GlobalProtect status: Connected": { 
-        "panelShowServer":true, // Indicates the panel text is built up with the country and ID of the VPN server
+        "panelText":"CONNECTED",// Static panel button text
         "styleClass":"green",   // CSS class for panel button
         "canConnect":false,     // Connect menu item enabled true/false
         "canDisconnect":true,   // Disconnect menu item enabled true/false
@@ -128,15 +128,12 @@ const VpnIndicator = new Lang.Class({
         // Stop the refreshes
         this._clearTimeout();        
 
-        // Read the VPN status from the command line
-        const [ok, standardOut, standardError, exitStatus] = GLib.spawn_command_line_sync(CMD_VPNSTATUS);
-
-        // Convert Uint8Array object to string and split up the different messages
-        const statusMessages = ByteArray.toString(standardOut).split('\n');
+        // Read the VPN status
+        let [res, out, err, exit] = GLib.spawn_sync(null, ["/bin/bash", "-c", "/bin/grep gpd /proc/net/route"], null, GLib.SpawnFlags.SEARCH_PATH, null);
 
         // Determine the correct state from the "Status: xxxx" line
         // TODO: use results from vpn command to give details of error
-        let vpnStatus = _states[statusMessages[0]] || _states.ERROR;
+        let vpnStatus = exit ? _states["GlobalProtect status: Disconnected"] : _states["GlobalProtect status: Connected"];
 
         // If a state override is active, increment it and override the state if appropriate
         if (_stateOverride) {
@@ -153,34 +150,36 @@ const VpnIndicator = new Lang.Class({
         }
 
         // Update the menu and panel based on the current state
-        this._updateMenu(vpnStatus, statusMessages[0]);
-        this._updatePanel(vpnStatus, statusMessages);
+        this._updateMenu(vpnStatus);
+        this._updatePanel(vpnStatus);
 
         // Start the refreshes again
         this._setTimeout(vpnStatus.refreshTimeout);
     },
 
+    _childExited: function (pid, status) {
+        // closes the process
+        GLib.spawn_close_pid(pid); // check the exit status
+    
+        if (_stateOverride) {
+            // State override cleared
+            _stateOverride = undefined;
+            _stateOverrideCounter = 0;            
+        }
+    },
+    
     _updateMenu (vpnStatus, statusText) {
         // Set the status text on the menu
-        _statusLabel.text = statusText;
+        _statusLabel.text = vpnStatus.panelText;
         
         // Activate / deactivate menu items
         _connectMenuItem.actor.reactive = vpnStatus.canConnect;
         _disconnectMenuItem.actor.reactive = vpnStatus.canDisconnect;
     },
 
-    _updatePanel(vpnStatus, statusMessages) {
-        let panelText;
-
-        // If connected, build up the panel text based on the server location and number
-        if (vpnStatus.panelShowServer) {
-            let country = statusMessages[2].replace("Country: ", "").toUpperCase();
-            let serverNumber = statusMessages[1].match(/\d+/);
-            panelText  = country + " #" + serverNumber;
-        }
-
+    _updatePanel(vpnStatus) {
         // Update the panel button
-        _panelLabel.text = panelText || vpnStatus.panelText;
+        _panelLabel.text = vpnStatus.panelText;
         _panelLabel.style_class = vpnStatus.styleClass;
     },
 
