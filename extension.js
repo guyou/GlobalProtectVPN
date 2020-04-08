@@ -308,4 +308,5 @@ function disable() {
 
 function destroy () {
     _vpnIndicator.destroy();
+    _vpnIndicator = null;
 }
