@@ -4,6 +4,7 @@
     "uuid": "globalprotectvpn@guyou",
     "version": 1,
     "shell-version": [
-        "3.28.4"
+        "3.28.4",
+        "3.34"
     ]
 }
