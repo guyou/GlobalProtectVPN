@@ -90,7 +90,7 @@ const VpnIndicator = new Lang.Class({
         this.parent(0.0, "VPN Indicator", false);
     },
 
-    enable () {
+    enable: function () {
         // Create the button with label for the panel
         let button = new St.Bin({
             style_class: 'panel-button',
@@ -124,7 +124,7 @@ const VpnIndicator = new Lang.Class({
         this._refresh();
     },
 
-    _refresh () {
+    _refresh: function () {
         // Stop the refreshes
         this._clearTimeout();        
 
@@ -168,7 +168,7 @@ const VpnIndicator = new Lang.Class({
         }
     },
     
-    _updateMenu (vpnStatus, statusText) {
+    _updateMenu: function (vpnStatus, statusText) {
         // Set the status text on the menu
         _statusLabel.text = vpnStatus.panelText;
         
@@ -177,7 +177,7 @@ const VpnIndicator = new Lang.Class({
         _disconnectMenuItem.actor.reactive = vpnStatus.canDisconnect;
     },
 
-    _updatePanel(vpnStatus) {
+    _updatePanel: function (vpnStatus) {
         // Update the panel button
         _panelLabel.text = vpnStatus.panelText;
         _panelLabel.style_class = vpnStatus.styleClass;
@@ -201,7 +201,7 @@ const VpnIndicator = new Lang.Class({
         }
     },
 
-    _spawn (cmd, state) {
+    _spawn: function (cmd, state) {
         let [successP, argv] = this._parseCmd(cmd);
         if (successP) {
             let successS, pid;
@@ -244,17 +244,17 @@ const VpnIndicator = new Lang.Class({
         }
     },
 
-    _connect () {
+    _connect: function () {
         // Run the connect command
         this._spawn(CMD_CONNECT, _states["GlobalProtect status: Connecting"]);
     },
 
-    _disconnect () {
+    _disconnect: function () {
         // Run the disconnect command
         this._spawn(CMD_DISCONNECT, _states["GlobalProtect status: Disconnecting"]);
     },
 
-    _clearTimeout () {
+    _clearTimeout: function () {
         // Remove the refresh timer if active
         if (this._timeout) {
             Mainloop.source_remove(this._timeout);
@@ -262,12 +262,12 @@ const VpnIndicator = new Lang.Class({
         }
     },
 
-    _setTimeout (timeoutDuration) {
+    _setTimeout: function (timeoutDuration) {
         // Refresh after an interval
         this._timeout = Mainloop.timeout_add_seconds(timeoutDuration, Lang.bind(this, this._refresh));
     },
 
-    disable () {
+    disable: function () {
 
         // Clear timeout and remove menu callback
         this._clearTimeout();
@@ -281,7 +281,7 @@ const VpnIndicator = new Lang.Class({
         }
     },
 
-    destroy () {
+    destroy: function () {
         // Call destroy on the parent
         this.parent();
     }
