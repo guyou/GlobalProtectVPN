@@ -2,7 +2,7 @@
     "name": "GlobalProtect VPN",
     "description": "Controls your GlobalProtect connection and shows its current status.",
     "uuid": "globalprotectvpn@guyou",
-    "version": 1,
+    "version": 2,
     "shell-version": [
         "3.22",
         "3.28.4",
